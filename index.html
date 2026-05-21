@@ -460,10 +460,12 @@ function parseCSV(text) {
 // ══════════════════════════════════════════════════════════════
 async function fetchTab(sheetId, tabName) {
   const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tabName)}`;
-  const resp = await fetch(url);
+  const resp = await fetch(url, { mode: 'cors', credentials: 'omit' });
   if(!resp.ok) throw new Error(`Aba "${tabName}" não encontrada (HTTP ${resp.status})`);
   const text = await resp.text();
-  if(text.includes('Moved Temporarily') || text.includes('<html')) throw new Error(`Permissão negada na aba "${tabName}". Verifique o compartilhamento da planilha.`);
+  if(text.includes('Moved Temporarily') || text.includes('signin') || text.includes('<html')) {
+    throw new Error(`Permissão negada na aba "${tabName}". Planilha precisa estar pública.`);
+  }
   return parseCSV(text);
 }
 
@@ -727,7 +729,7 @@ async function loadDashboard(sheetId) {
   setStatus('Verificando acesso à planilha…');
   try {
     const testUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv`;
-    const testResp = await fetch(testUrl);
+    const testResp = await fetch(testUrl, { mode: 'cors', credentials: 'omit' });
     if(!testResp.ok) throw new Error('HTTP ' + testResp.status);
     const testText = await testResp.text();
     if(testText.includes('Sign in') || testText.includes('Faça login') || testText.includes('<html')) {
@@ -1008,7 +1010,12 @@ window.addEventListener('DOMContentLoaded', async ()=>{
   const inputEl = document.getElementById('input-sheet-id');
   if(inputEl) inputEl.value = saved;
 
-  await loadDashboard(saved);
+  try {
+    await loadDashboard(saved);
+  } catch(e) {
+    console.error('Erro crítico ao carregar dashboard:', e);
+    showError('Erro inesperado: ' + e.message);
+  }
 });
 </script>
 </body>
